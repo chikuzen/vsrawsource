@@ -401,13 +401,13 @@ static inline const char * VS_CC get_format(char *ctag)
         { "444",      "YUV444P8"  },
         { "444p9",    "YUV444P9"  },
         { "444p10",   "YUV444P10" },
-        { "444P16",   "YUV444P16" },
+        { "444p16",   "YUV444P16" },
         { "444alpha", "YUV444P8A" },
         { ctag,       "YUV420P8"  }
     };
 
     int i = 0;
-    while (strcmp(ctag, table[i].tag) != 0) i++;
+    while (strcasecmp(ctag, table[i].tag) != 0) i++;
     return table[i].format;
 }
 

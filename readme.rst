@@ -9,7 +9,7 @@ Usage:
     >>> core = vs.Core()
     >>> core.std.LoadPlugin('vsrawsource.dll')
     >>> clip = core.raws.Source('/path/to/file.raw')
-    
+
 options:
     width      video width (default 720)
 
@@ -29,6 +29,12 @@ options:
 
 supported color formats:
     see core.raws.FormatList()
+
+How to compile:
+    $ git clone git://github.com/chikuzen/vsrawsource.git
+    $ cd ./vsrawsource
+    $ ./configure
+    $ make
 
 source code:
     https://github.com/chikuzen/vsrawsource

@@ -4,7 +4,7 @@ SRCS = rawsource.c format_list.c
 
 OBJS = $(SRCS:%.c=%.o)
 
-.PHONY: all clean
+.PHONY: all cleanÅ@distclean
 
 all: $(LIBNAME)
 
