@@ -575,6 +575,9 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
 
 static void close_handler(rs_hnd_t *rh)
 {
+    if (!rh) {
+        return;
+    }
     if (rh->frame_buff) {
         rs_free(rh->frame_buff);
     }
@@ -689,15 +692,11 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
     char *msg = msg_buff + strlen(msg_buff);
 
     rs_hnd_t *rh = (rs_hnd_t *)calloc(sizeof(rs_hnd_t), 1);
-    if (!rh) {
-        sprintf(msg, "couldn't create handler");
-        vsapi->setError(out, msg_buff);
-        return;
-    }
+    RET_IF_ERROR(!rh, "couldn't create handler");
 
     const char *src = vsapi->propGetData(in, "source", 0, 0);
     struct stat st;
-    RET_IF_ERROR(stat(src, &st) != 0, "source does not exists.");
+    RET_IF_ERROR(stat(src, &st) != 0, "source does not exist.");
 
     rh->file_size = st.st_size;
     RET_IF_ERROR(rh->file_size == 0, "coudn't get source file size");
