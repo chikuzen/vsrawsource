@@ -10,7 +10,7 @@ all: $(LIBNAME)
 
 $(LIBNAME): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^
-	-@ $(if $(STRIP), $(STRIP) -x $@)
+	$(if $(STRIP), $(STRIP) -x $@)
 
 %.o: %.c .depend
 	$(CC) -c $(CFLAGS) -o $@ $<
