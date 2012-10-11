@@ -57,9 +57,7 @@
 #define FORMAT_MAX_LEN 32
 
 
-typedef void (VS_CC *func_write_frame)(void *, VSFrameRef *, const VSAPI *);
-
-typedef struct {
+typedef struct rs_hndle {
     FILE *file;
     int64_t file_size;
     uint32_t frame_size;
@@ -69,10 +67,11 @@ typedef struct {
     int off_frame;
     int64_t *index;
     uint8_t *frame_buff;
-    func_write_frame write_frame;
+    void (VS_CC *write_frame)(struct rs_hndle *, VSFrameRef *, const VSAPI *);
     VSVideoInfo vi;
 } rs_hnd_t;
 
+typedef void (VS_CC *write_frame)(rs_hnd_t *, VSFrameRef *, const VSAPI *);
 
 typedef struct {
     const VSMap *in;
@@ -96,7 +95,7 @@ static void *rs_malloc(size_t size)
 }
 
 
-static void rs_free(void *p)
+static void rs_free(uint8_t *p)
 {
 #ifdef __MINGW32__
     _aligned_free(p);
@@ -135,9 +134,8 @@ bitor8to32(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3)
 
 
 static void VS_CC
-write_planar_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_planar_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     uint8_t *srcp = rh->frame_buff;
 
     for (int i = 0, num = rh->vi.format->numPlanes; i < num; i++) {
@@ -151,13 +149,12 @@ write_planar_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_nvxx_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_nvxx_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct uv_t {
         uint8_t c[8];
     };
 
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     uint8_t *srcp_orig = rh->frame_buff;
 
     int row_size = vsapi->getFrameWidth(dst, 0);
@@ -188,13 +185,12 @@ write_nvxx_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_px1x_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_px1x_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct uv16_t {
         uint16_t c[2];
     };
 
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     uint8_t *srcp = rh->frame_buff;
 
     int row_size = vsapi->getFrameWidth(dst, 0) << 1;
@@ -221,13 +217,12 @@ write_px1x_frame(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb24(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb24(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct rgb24_t {
         uint8_t c[12];
     };
 
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     uint8_t *srcp_orig = rh->frame_buff;
     int row_size = (rh->vi.width + 3) >> 2;
     int height = rh->vi.height;
@@ -256,13 +251,12 @@ write_packed_rgb24(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb48(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb48(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct rgb48_t {
         uint16_t c[3];
     };
 
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     struct rgb48_t *srcp = (struct rgb48_t *)rh->frame_buff;
     int width = rh->vi.width;
     int height = rh->vi.height;
@@ -287,13 +281,12 @@ write_packed_rgb48(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb32(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb32(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct rgb32_t {
         uint8_t c[16];
     };
 
-    rs_hnd_t *rh = (rs_hnd_t *)p;
     uint8_t *srcp_orig = rh->frame_buff;
     int src_stride = rh->vi.width << 2;
     int row_size = (rh->vi.width + 3) >> 2;
@@ -329,13 +322,12 @@ write_packed_rgb32(void *p, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_yuv422(void *p, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_yuv422(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 {
     struct packed422_t {
         uint8_t c[4];
     };
 
-    rs_hnd_t * rh = (rs_hnd_t *)p;
     struct packed422_t *srcp = (struct packed422_t *)rh->frame_buff;
     int width = rh->vi.width >> 1;
     int height = rh->vi.height;
@@ -456,6 +448,12 @@ static int VS_CC check_y4m(rs_hnd_t *rh)
                 return -1;
             }
         }
+        if (!strncmp(buff + i, " I", 2)) {
+            i += 2;
+            if (buff[i] == 'm') {
+                return -2;
+            }
+        }
         if (!strncmp(buff + i, " C", 2)) {
             i += 2;
             sscanf(buff + i, "%s", ctag);
@@ -492,7 +490,7 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         int bits_per_pix;
         int order[4];
         VSPresetFormat vsformat;
-        func_write_frame func;
+        write_frame func;
     } table[] = {
         { "i420",      2, 2, 12, { 0, 1, 2, 9 }, pfYUV420P8,  write_planar_frame  },
         { "IYUV",      2, 2, 12, { 0, 1, 2, 9 }, pfYUV420P8,  write_planar_frame  },
@@ -720,7 +718,7 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
         set_args_int64(&rh->vi.fpsDen, 1001, "fpsden", &va);
         set_args_int(&rh->off_header, 0, "off_header", &va);
         set_args_int(&rh->off_frame, 0, "off_frame", &va);
-        set_args_data(rh->src_format, "YUV420P8", "src_fmt", FORMAT_MAX_LEN, &va);
+        set_args_data(rh->src_format, "I420", "src_fmt", FORMAT_MAX_LEN, &va);
     }
 
     const char *ca = check_args(rh, &va);
