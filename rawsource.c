@@ -533,6 +533,7 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         { "ABGR",      1, 1, 32, { 9, 2, 1, 0 }, pfRGB24,     write_packed_rgb32  },
         { "RGBA",      1, 1, 32, { 0, 1, 2, 9 }, pfRGB24,     write_packed_rgb32  },
         { "ARGB",      1, 1, 32, { 9, 0, 1, 2 }, pfRGB24,     write_packed_rgb32  },
+        { "AYUV",      1, 1, 32, { 9, 0, 1, 2 }, pfYUV444P8,  write_packed_rgb32  },
         { "GBRP8",     1, 1, 24, { 1, 2, 0, 9 }, pfRGB24,     write_planar_frame  },
         { "RGBP8",     1, 1, 24, { 0, 1, 2, 9 }, pfRGB24,     write_planar_frame  },
         { "GBRP9",     1, 1, 48, { 1, 2, 0, 9 }, pfRGB27,     write_planar_frame  },

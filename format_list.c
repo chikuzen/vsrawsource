@@ -75,6 +75,8 @@ show_format_list(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
         "    RGBP16, GBRP16\n"
         "YUV4:2:2 8bit packed format:\n"
         "    YUY2, YUYV, UYVY, YVYU, VYUV\n"
+        "YUV4:4:4 8bit packed format:\n"
+        "    AYUV\n"
         "RGB 8bit packed format:\n"
         "    RGB, BGR, RGBA, ARGB, BGRA, ABGR\n"
         "RGB 16bit packed format:\n"
