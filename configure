@@ -118,7 +118,7 @@ if test -n "$DEBUG"; then
     CFLAGS="$CFLAGS -g3 -O0"
     STRIP=""
 else
-    CFLAGS="-Os -g0 -ffast-math $CFLAGS"
+    CFLAGS="-Os -g0 -ffast-math -fomit-frame-pointer $CFLAGS"
 fi
 
 if ! cc_check "$CFLAGS" "$LDFLAGS"; then

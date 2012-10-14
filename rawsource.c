@@ -53,7 +53,7 @@
 #include "VapourSynth.h"
 
 
-#define VS_RAWS_VERSION "0.1.0"
+#define VS_RAWS_VERSION "0.1.1"
 #define FORMAT_MAX_LEN 32
 
 
@@ -79,10 +79,6 @@ typedef struct {
     VSCore *core;
     const VSAPI *vsapi;
 } vs_args_t;
-
-
-extern void VS_CC
-show_format_list(const VSMap *, VSMap *, void *, VSCore *, const VSAPI *);
 
 
 static void *rs_malloc(size_t size)
@@ -746,11 +742,10 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(
     VSConfigPlugin f_config, VSRegisterFunction f_register, VSPlugin *plugin)
 {
     f_config("chikuzen.does.not.have.his.own.domain.raws", "raws",
-             "Raw-format file Reader for VapourSynth" VS_RAWS_VERSION,
+             "Raw-format file Reader for VapourSynth " VS_RAWS_VERSION,
              VAPOURSYNTH_API_VERSION, 1, plugin);
     f_register("Source", "source:data;width:int:opt;height:int:opt;"
                "fpsnum:int:opt;fpsden:int:opt;src_fmt:data:opt;"
                "header_off:int:opt;frame_off:int:opt",
                create_source, NULL, plugin);
-    f_register("FormatList", "", show_format_list, NULL, plugin);
 }

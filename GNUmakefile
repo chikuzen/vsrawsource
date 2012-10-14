@@ -1,6 +1,6 @@
 include config.mak
 
-SRCS = rawsource.c format_list.c
+SRCS = rawsource.c
 
 OBJS = $(SRCS:%.c=%.o)
 

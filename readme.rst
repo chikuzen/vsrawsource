@@ -25,7 +25,7 @@ options:
 
 supported color formats:
 ------------------------
-    see core.raws.FormatList()
+    see format_list.txt.
 
 How to compile:
 ---------------
