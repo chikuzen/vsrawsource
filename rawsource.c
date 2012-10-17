@@ -460,6 +460,12 @@ static int VS_CC check_y4m(rs_hnd_t *rh)
 #undef PARSE_HEADER
 
 
+static inline int abs_i(int i)
+{
+    return i < 0 ? -i : i;
+}
+
+
 static int check_bmp(rs_hnd_t *rh)
 {
     uint32_t offset_data;
@@ -474,8 +480,8 @@ static int check_bmp(rs_hnd_t *rh)
         return 1;
     }
 
-    rh->vi.width = info.width;
-    rh->vi.height = info.height;
+    rh->vi.width = abs_i(info.width);
+    rh->vi.height = abs_i(info.height);
     strcpy(rh->src_format, info.bits_per_pixel == 24 ? "BGR" : "BGRA");
     rh->off_header = offset_data;
     rh->row_adjust = 4;
