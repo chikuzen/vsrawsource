@@ -1,5 +1,5 @@
 /*
-  vsrawsource.c: Raw Format Reader for VapourSynth
+  rawsource.c: Raw Format Reader for VapourSynth
 
   This file is a part of vsrawsource
 
@@ -25,8 +25,6 @@
 
 #include "rawsource.h"
 #include "VapourSynth.h"
-
-
 
 #define FORMAT_MAX_LEN 32
 
@@ -460,7 +458,7 @@ static int VS_CC check_y4m(rs_hnd_t *rh)
 #undef PARSE_HEADER
 
 
-static inline int abs_i(int i)
+static inline int32_t abs_i(int32_t i)
 {
     return i < 0 ? -i : i;
 }
