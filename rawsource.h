@@ -28,9 +28,17 @@
 
 #define VS_RAWS_VERSION "0.2.0"
 
+#ifdef _WIN32
 #ifdef __MINGW32__
 #define rs_fseek fseeko64
 #define rs_ftell ftello64
+#else
+#pragma warning(disable:4996)
+#define rs_fseek _fseeki64
+#define rs_ftell _ftelli64
+#define snprintf _snprintf
+#define strcasecmp stricmp
+#endif
 #endif
 
 #include <stdio.h>
@@ -45,14 +53,12 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <stdarg.h>
-#include <inttypes.h>
 
-#ifdef __MINGW32__
-#   if __MSVCRT_VERSION__ < 0x0700
-#   undef __MSVCRT_VERSION__
-#   define __MSVCRT_VERSION__ 0x0700
-#   endif
-#include <malloc.h>
+#ifdef __GNUC__
+#include <inttypes.h>
+#else
+#include <stdint.h>
+#define SCNi64 "lld"
 #endif
 
 typedef struct {

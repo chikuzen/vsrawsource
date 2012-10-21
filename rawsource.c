@@ -54,26 +54,6 @@ typedef struct {
 } vs_args_t;
 
 
-static void *rs_malloc(size_t size)
-{
-#ifdef __MINGW32__
-    return _aligned_malloc(size, 16);
-#else
-    return malloc(size);
-#endif
-}
-
-
-static void rs_free(uint8_t *p)
-{
-#ifdef __MINGW32__
-    _aligned_free(p);
-#else
-    free(p);
-#endif
-}
-
-
 static void VS_CC
 rs_bit_blt(uint8_t *srcp, int row_size, int height, VSFrameRef *dst, int plane,
            const VSAPI *vsapi)
@@ -594,7 +574,7 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
     int frame_size = 0;
     for (int p = 0; p < table[i].num_planes; p++) {
         int width_plane =
-            (rh->vi.width / (p ? table[i].subsample_h : 1)) << (table[i].num_planes == 2 && p);
+            (rh->vi.width / (p ? table[i].subsample_h : 1)) << (table[i].num_planes == 2 && p ? 1 : 0);
         int height_plane = rh->vi.height / (p ? table[i].subsample_h : 1);
         int row_size_plane =
             (width_plane * table[i].bytes_per_row_sample + rh->row_adjust) & (~rh->row_adjust);
@@ -615,7 +595,7 @@ static void close_handler(rs_hnd_t *rh)
         return;
     }
     if (rh->frame_buff) {
-        rs_free(rh->frame_buff);
+        free(rh->frame_buff);
     }
     if (rh->index) {
         free(rh->index);
@@ -682,7 +662,7 @@ static void VS_CC
 set_args_int(int *p, int default_value, const char *arg, vs_args_t *va)
 {
     int err;
-    *p = va->vsapi->propGetInt(va->in, arg, 0, &err);
+    *p = (int)va->vsapi->propGetInt(va->in, arg, 0, &err);
     if (err) {
         *p = default_value;
     }
@@ -769,12 +749,12 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
     RET_IF_ERROR(ca, "%s", ca);
 
     rh->vi.numFrames =
-        (rh->file_size - rh->off_header) / (rh->off_frame + rh->frame_size);
+        (int)((rh->file_size - rh->off_header) / (rh->off_frame + rh->frame_size));
     RET_IF_ERROR(rh->vi.numFrames < 1, "too small file size");
 
     RET_IF_ERROR(create_index(rh), "failed to create index");
 
-    rh->frame_buff = rs_malloc(rh->frame_size + 32);
+    rh->frame_buff = (uint8_t *)malloc(rh->frame_size + 32);
     RET_IF_ERROR(!rh->frame_buff, "failed to allocate buffer");
 
     const VSNodeRef *node =

@@ -30,12 +30,17 @@ supported color formats:
 
 How to compile:
 ---------------
-    type as follows::
+    on unix system(include mingw/cygwin), type as follows::
 
     $ git clone git://github.com/chikuzen/vsrawsource.git
     $ cd ./vsrawsource
     $ ./configure
     $ make
+
+    if you want to use msvc++, then
+
+    - rename rawsource.c to rawsource.cpp
+    - create vcxproj yourself
 
 source code:
 ------------
