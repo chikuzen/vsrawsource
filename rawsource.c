@@ -774,7 +774,7 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
 
     RET_IF_ERROR(create_index(rh), "failed to create index");
 
-    rh->frame_buff = rs_malloc(rh->file_size + 32);
+    rh->frame_buff = rs_malloc(rh->frame_size + 32);
     RET_IF_ERROR(!rh->frame_buff, "failed to allocate buffer");
 
     const VSNodeRef *node =
