@@ -774,6 +774,6 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(
              VAPOURSYNTH_API_VERSION, 1, plugin);
     f_register("Source", "source:data;width:int:opt;height:int:opt;"
                "fpsnum:int:opt;fpsden:int:opt;src_fmt:data:opt;"
-               "header_off:int:opt;frame_off:int:opt;rowbytes_align:int:opt",
+               "off_header:int:opt;off_frame:int:opt;rowbytes_align:int:opt",
                create_source, NULL, plugin);
 }
