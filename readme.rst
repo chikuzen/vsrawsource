@@ -17,6 +17,8 @@ options:
     - **height**         video height (1~ default 480)
     - **fpsnum**         framerate numerator (1~ default 30000)
     - **fpsden**         framerate denominator (1~ default 1001)
+    - **sarnum**         sample aspect ratio numerator (0~ default 1)
+    - **sarden**         sample aspect ratio denominator (0~ default 1)
     - **src_fmt**        color format of source video (default 'I420')
     - **off_header**     offset to the first frame data (0~ default 0)
     - **off_frame**      offset to the real data for every frame (0~ default 0)
