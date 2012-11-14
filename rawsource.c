@@ -620,7 +620,7 @@ vs_init(VSMap *in, VSMap *out, void **instance_data, VSNode *node,
         VSCore *core, const VSAPI *vsapi)
 {
     rs_hnd_t *rh = (rs_hnd_t *)*instance_data;
-    vsapi->setVideoInfo(&rh->vi, node);
+    vsapi->setVideoInfo(&rh->vi, 1, node);
 }
 
 
@@ -649,8 +649,8 @@ rs_get_frame(int n, int activation_reason, void **instance_data,
                                            rh->vi.height, NULL, core);
 
     VSMap *props = vsapi->getFramePropsRW(dst);
-    vsapi->propSetInt(props, "_DurationNum", rh->vi.fpsDen, 0);
-    vsapi->propSetInt(props, "_DurationDen", rh->vi.fpsNum, 0);
+    vsapi->propSetInt(props, "_DurationNum", rh->vi.fpsDen, paReplace);
+    vsapi->propSetInt(props, "_DurationDen", rh->vi.fpsNum, paReplace);
 
     rh->write_frame(rh, dst, vsapi);
 
@@ -757,11 +757,8 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
     rh->frame_buff = (uint8_t *)malloc(rh->frame_size + 32);
     RET_IF_ERROR(!rh->frame_buff, "failed to allocate buffer");
 
-    const VSNodeRef *node =
-        vsapi->createFilter(in, out, "Source", vs_init, rs_get_frame, vs_close,
-                            fmSerial, 0, rh, core);
-
-    vsapi->propSetNode(out, "clip", node, 0);
+    vsapi->createFilter(in, out, "Source", vs_init, rs_get_frame, vs_close,
+                        fmSerial, 0, rh, core);
 }
 #undef RET_IF_ERROR
 
