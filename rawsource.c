@@ -37,6 +37,8 @@ typedef struct rs_hndle {
     int order[4];
     int off_header;
     int off_frame;
+    int sar_num;
+    int sar_den;
     int row_adjust;
     int64_t *index;
     uint8_t *frame_buff;
@@ -404,6 +406,13 @@ static int VS_CC check_y4m(rs_hnd_t *rh)
                 return -1;
             }
         }
+        if (!strncmp(buff + i, " A", 2)) {
+            i += 2;
+            sscanf(buff + i, "%d:%d", &rh->sar_num, &rh->sar_den);
+            if (rh->sar_num < 0 || rh->sar_den < 0) {
+                return -1;
+            }
+        }
         if (!strncmp(buff + i, " I", 2)) {
             i += 2;
             if (buff[i] == 'm') {
@@ -651,6 +660,8 @@ rs_get_frame(int n, int activation_reason, void **instance_data,
     VSMap *props = vsapi->getFramePropsRW(dst);
     vsapi->propSetInt(props, "_DurationNum", rh->vi.fpsDen, paReplace);
     vsapi->propSetInt(props, "_DurationDen", rh->vi.fpsNum, paReplace);
+    vsapi->propSetInt(props, "_SARNum", rh->sar_num, paReplace);
+    vsapi->propSetInt(props, "_SARDen", rh->sar_den, paReplace);
 
     rh->write_frame(rh, dst, vsapi);
 
@@ -731,6 +742,8 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
         set_args_int(&rh->vi.height, 480, "height", &va);
         set_args_int(&rh->off_header, 0, "off_header", &va);
         set_args_int(&rh->off_frame, 0, "off_frame", &va);
+        set_args_int(&rh->sar_num, 1, "sarnum", &va);
+        set_args_int(&rh->sar_den, 1, "sarden", &va);
         set_args_int(&rh->row_adjust, 1, "rowbytes_align", &va);
         set_args_data(rh->src_format, "I420", "src_fmt", FORMAT_MAX_LEN, &va);
     }
@@ -770,7 +783,7 @@ VS_EXTERNAL_API(void) VapourSynthPluginInit(
              "Raw-format file Reader for VapourSynth " VS_RAWS_VERSION,
              VAPOURSYNTH_API_VERSION, 1, plugin);
     f_register("Source", "source:data;width:int:opt;height:int:opt;"
-               "fpsnum:int:opt;fpsden:int:opt;src_fmt:data:opt;"
-               "off_header:int:opt;off_frame:int:opt;rowbytes_align:int:opt",
-               create_source, NULL, plugin);
+               "fpsnum:int:opt;fpsden:int:opt;sarnum:int:opt;sarden:int:opt;"
+               "src_fmt:data:opt;off_header:int:opt;off_frame:int:opt;"
+               "rowbytes_align:int:opt", create_source, NULL, plugin);
 }
