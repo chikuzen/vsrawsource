@@ -77,4 +77,4 @@ vsrawsource -- all supported format names
 - RGB 16bit packed format:
     RGB48, BGR48
     
-note: all alpha channel data will be lost.
+note: all alpha channel data will be stored in "_Alpha" prop of each frames.

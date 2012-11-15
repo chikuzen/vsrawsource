@@ -29,7 +29,11 @@
 #define FORMAT_MAX_LEN 32
 
 
-typedef struct rs_hndle {
+typedef struct rs_hndle rs_hnd_t;
+typedef void (VS_CC *func_write_frame)(rs_hnd_t *, VSFrameRef *, const VSAPI *,
+                                       VSCore *);
+
+struct rs_hndle {
     FILE *file;
     int64_t file_size;
     uint32_t frame_size;
@@ -42,11 +46,11 @@ typedef struct rs_hndle {
     int row_adjust;
     int64_t *index;
     uint8_t *frame_buff;
-    void (VS_CC *write_frame)(struct rs_hndle *, VSFrameRef *, const VSAPI *);
+    func_write_frame write_frame;
     VSVideoInfo vi;
-} rs_hnd_t;
+};
 
-typedef void (VS_CC *write_frame)(rs_hnd_t *, VSFrameRef *, const VSAPI *);
+
 
 typedef struct {
     const VSMap *in;
@@ -85,24 +89,43 @@ bitor8to32(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3)
 
 
 static void VS_CC
-write_planar_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_planar_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                   VSCore *core)
 {
     uint8_t *srcp = rh->frame_buff;
+    int bps = rh->vi.format->bytesPerSample;
+    int row_size, height;
 
     for (int i = 0, num = rh->vi.format->numPlanes; i < num; i++) {
         int plane = rh->order[i];
-        int row_size =
-            vsapi->getFrameWidth(dst, plane) * rh->vi.format->bytesPerSample;
+        row_size = vsapi->getFrameWidth(dst, plane) * bps;
         row_size = (row_size + rh->row_adjust) & (~rh->row_adjust);
-        int height = vsapi->getFrameHeight(dst, plane);
+        height = vsapi->getFrameHeight(dst, plane);
         rs_bit_blt(srcp, row_size, height, dst, plane, vsapi);
         srcp += row_size * height;
     }
+    
+    if (rh->order[3] == 9) {
+        return;
+    }
+
+    VSPresetFormat format = bps == 1 ? pfGray8 : pfGray16;
+    VSFrameRef *alpha = vsapi->newVideoFrame(
+                            vsapi->getFormatPreset(format, core),
+                            rh->vi.width, rh->vi.height, NULL, core);
+    row_size = vsapi->getFrameWidth(alpha, 0) * bps;
+    row_size = (row_size + rh->row_adjust) & (~rh->row_adjust);
+    height = vsapi->getFrameHeight(alpha, 0);
+    rs_bit_blt(srcp, row_size, height, alpha, 0, vsapi);
+    
+    vsapi->propSetFrame(vsapi->getFramePropsRW(dst), "_Alpha", alpha, paReplace);
+    vsapi->freeFrame(alpha);
 }
 
 
 static void VS_CC
-write_nvxx_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_nvxx_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                 VSCore *core)
 {
     struct uv_t {
         uint8_t c[8];
@@ -139,7 +162,8 @@ write_nvxx_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_px1x_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_px1x_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                 VSCore *core)
 {
     struct uv16_t {
         uint16_t c[2];
@@ -173,7 +197,8 @@ write_px1x_frame(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb24(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb24(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                   VSCore *core)
 {
     struct rgb24_t {
         uint8_t c[12];
@@ -207,7 +232,8 @@ write_packed_rgb24(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb48(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb48(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                   VSCore *core)
 {
     struct rgb48_t {
         uint16_t c[3];
@@ -238,7 +264,8 @@ write_packed_rgb48(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
 
 
 static void VS_CC
-write_packed_rgb32(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_rgb32(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                   VSCore *core)
 {
     struct rgb32_t {
         uint8_t c[16];
@@ -250,36 +277,43 @@ write_packed_rgb32(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
     int height = rh->vi.height;
 
     int *order = rh->order;
-    int offset = 0;
-    if (order[0] == 9) {
-        order++;
-        offset++;
-    }
 
-    uint8_t *dstp0_orig = vsapi->getWritePtr(dst, order[0]);
-    uint8_t *dstp1_orig = vsapi->getWritePtr(dst, order[1]);
-    uint8_t *dstp2_orig = vsapi->getWritePtr(dst, order[2]);
-    int dst_stride = vsapi->getStride(dst, 0);
+    VSFrameRef *alpha = 
+        vsapi->newVideoFrame(vsapi->getFormatPreset(pfGray8, core),
+                             rh->vi.width, rh->vi.height, NULL, core);
+
+    uint32_t *dstp[4];
+    for (int i = 0; i < 3; i++) {
+        dstp[i] = (uint32_t *)vsapi->getWritePtr(dst, i);
+    }
+    dstp[3] = (uint32_t *)vsapi->getWritePtr(alpha, 0);
+    int dst_stride = vsapi->getStride(dst, 0) >> 2;
 
     for (int y = 0; y < height; y++) {
         struct rgb32_t *srcp = (struct rgb32_t *)(srcp_orig + y * src_stride);
-        uint32_t *dstp0 = (uint32_t *)(dstp0_orig + y * dst_stride);
-        uint32_t *dstp1 = (uint32_t *)(dstp1_orig + y * dst_stride);
-        uint32_t *dstp2 = (uint32_t *)(dstp2_orig + y * dst_stride);
         for (int x = 0; x < row_size; x++) {
-            dstp0[x] = bitor8to32(srcp[x].c[offset + 12], srcp[x].c[offset + 8],
-                                  srcp[x].c[offset + 4], srcp[x].c[offset]);
-            dstp1[x] = bitor8to32(srcp[x].c[offset + 13], srcp[x].c[offset + 9],
-                                  srcp[x].c[offset + 5], srcp[x].c[offset + 1]);
-            dstp2[x] = bitor8to32(srcp[x].c[offset + 14], srcp[x].c[offset + 10],
-                                  srcp[x].c[offset + 6], srcp[x].c[offset + 2]);
+            *(dstp[order[0]] + x) = bitor8to32(srcp[x].c[12], srcp[x].c[8],
+                                               srcp[x].c[4], srcp[x].c[0]);
+            *(dstp[order[1]] + x) = bitor8to32(srcp[x].c[13], srcp[x].c[9],
+                                               srcp[x].c[5], srcp[x].c[1]);
+            *(dstp[order[2]] + x) = bitor8to32(srcp[x].c[14], srcp[x].c[10],
+                                               srcp[x].c[6], srcp[x].c[2]);
+            *(dstp[order[3]] + x) = bitor8to32(srcp[x].c[15], srcp[x].c[11],
+                                               srcp[x].c[5], srcp[x].c[3]);
+        }
+        for (int i = 0; i < 4; i++) {
+            dstp[i] += dst_stride;
         }
     }
+
+    vsapi->propSetFrame(vsapi->getFramePropsRW(dst), "_Alpha", alpha, paReplace);
+    vsapi->freeFrame(alpha);
 }
 
 
 static void VS_CC
-write_packed_yuv422(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi)
+write_packed_yuv422(rs_hnd_t *rh, VSFrameRef *dst, const VSAPI *vsapi,
+                    VSCore *core)
 {
     struct packed422_t {
         uint8_t c[4];
@@ -505,7 +539,7 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         int bytes_per_row_sample;
         int order[4];
         VSPresetFormat vsformat;
-        write_frame func;
+        func_write_frame func;
     } table[] = {
         { "i420",      2, 2, 3, 1, { 0, 1, 2, 9 }, pfYUV420P8,  write_planar_frame  },
         { "IYUV",      2, 2, 3, 1, { 0, 1, 2, 9 }, pfYUV420P8,  write_planar_frame  },
@@ -536,7 +570,7 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         { "YUV444P9",  2, 2, 3, 2, { 0, 1, 2, 9 }, pfYUV444P9,  write_planar_frame  },
         { "YUV444P10", 2, 2, 3, 2, { 0, 1, 2, 9 }, pfYUV444P10, write_planar_frame  },
         { "YUV444P16", 2, 2, 3, 2, { 0, 1, 2, 9 }, pfYUV444P16, write_planar_frame  },
-        { "YUV444P8A", 1, 1, 4, 1, { 0, 1, 2, 9 }, pfYUV444P8,  write_planar_frame  },
+        { "YUV444P8A", 1, 1, 4, 1, { 0, 1, 2, 3 }, pfYUV444P8,  write_planar_frame  },
         { "YUY2",      2, 1, 1, 4, { 0, 1, 0, 2 }, pfYUV422P8,  write_packed_yuv422 },
         { "YUYV",      2, 1, 1, 4, { 0, 1, 0, 2 }, pfYUV422P8,  write_packed_yuv422 },
         { "UYVY",      2, 1, 1, 4, { 1, 0, 2, 0 }, pfYUV422P8,  write_packed_yuv422 },
@@ -544,11 +578,11 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         { "VYUY",      2, 1, 1, 4, { 2, 0, 1, 0 }, pfYUV422P8,  write_packed_yuv422 },
         { "BGR",       1, 1, 1, 3, { 2, 1, 0, 9 }, pfRGB24,     write_packed_rgb24  },
         { "RGB",       1, 1, 1, 3, { 0, 1, 2, 9 }, pfRGB24,     write_packed_rgb24  },
-        { "BGRA",      1, 1, 1, 4, { 2, 1, 0, 9 }, pfRGB24,     write_packed_rgb32  },
-        { "ABGR",      1, 1, 1, 4, { 9, 2, 1, 0 }, pfRGB24,     write_packed_rgb32  },
-        { "RGBA",      1, 1, 1, 4, { 0, 1, 2, 9 }, pfRGB24,     write_packed_rgb32  },
-        { "ARGB",      1, 1, 1, 4, { 9, 0, 1, 2 }, pfRGB24,     write_packed_rgb32  },
-        { "AYUV",      1, 1, 1, 4, { 9, 0, 1, 2 }, pfYUV444P8,  write_packed_rgb32  },
+        { "BGRA",      1, 1, 1, 4, { 2, 1, 0, 3 }, pfRGB24,     write_packed_rgb32  },
+        { "ABGR",      1, 1, 1, 4, { 3, 2, 1, 0 }, pfRGB24,     write_packed_rgb32  },
+        { "RGBA",      1, 1, 1, 4, { 0, 1, 2, 3 }, pfRGB24,     write_packed_rgb32  },
+        { "ARGB",      1, 1, 1, 4, { 3, 0, 1, 2 }, pfRGB24,     write_packed_rgb32  },
+        { "AYUV",      1, 1, 1, 4, { 3, 0, 1, 2 }, pfYUV444P8,  write_packed_rgb32  },
         { "GBRP8",     1, 1, 3, 1, { 1, 2, 0, 9 }, pfRGB24,     write_planar_frame  },
         { "RGBP8",     1, 1, 3, 1, { 0, 1, 2, 9 }, pfRGB24,     write_planar_frame  },
         { "GBRP9",     1, 1, 3, 2, { 1, 2, 0, 9 }, pfRGB27,     write_planar_frame  },
@@ -557,8 +591,8 @@ static const char * VS_CC check_args(rs_hnd_t *rh, vs_args_t *va)
         { "RGBP10",    1, 1, 3, 2, { 0, 1, 2, 9 }, pfRGB30,     write_planar_frame  },
         { "GBRP16",    1, 1, 3, 2, { 1, 2, 0, 9 }, pfRGB48,     write_planar_frame  },
         { "RGBP16",    1, 1, 3, 2, { 0, 1, 2, 9 }, pfRGB48,     write_planar_frame  },
-        { "BGR48",     1, 1, 3, 2, { 2, 1, 0, 9 }, pfRGB48,     write_packed_rgb48  },
-        { "RGB48",     1, 1, 3, 2, { 0, 1, 2, 9 }, pfRGB48,     write_packed_rgb48  },
+        { "BGR48",     1, 1, 3, 2, { 2, 1, 0, 3 }, pfRGB48,     write_packed_rgb48  },
+        { "RGB48",     1, 1, 3, 2, { 0, 1, 2, 3 }, pfRGB48,     write_packed_rgb48  },
         { "NV12",      2, 2, 2, 1, { 0, 1, 2, 9 }, pfYUV420P8,  write_nvxx_frame    },
         { "NV21",      2, 2, 2, 1, { 0, 2, 1, 9 }, pfYUV420P8,  write_nvxx_frame    },
         { "P010",      2, 2, 2, 2, { 0, 1, 2, 9 }, pfYUV420P16, write_px1x_frame    },
@@ -663,7 +697,7 @@ rs_get_frame(int n, int activation_reason, void **instance_data,
     vsapi->propSetInt(props, "_SARNum", rh->sar_num, paReplace);
     vsapi->propSetInt(props, "_SARDen", rh->sar_den, paReplace);
 
-    rh->write_frame(rh, dst, vsapi);
+    rh->write_frame(rh, dst, vsapi, core);
 
     return dst;
 }
