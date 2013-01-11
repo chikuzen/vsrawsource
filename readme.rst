@@ -2,7 +2,7 @@
 vsrawsource - Raw format reader for VapourSynth
 ===============================================
 raw(uncompressed) video source filter for VapourSynth.
-Also, YUV4MPEG and WindowsBitmap(24bit/32bit RGB) are supported.
+Also, YUV4MPEG2 and WindowsBitmap(24bit/32bit RGB) are supported.
 
 Usage:
 ------
@@ -10,6 +10,11 @@ Usage:
     >>> core = vs.Core()
     >>> core.std.LoadPlugin('vsrawsource.dll')
     >>> clip = core.raws.Source('/path/to/file.raw')
+
+    If input file has alpha channel,
+    >>> clips = core.raws.Source('/path/to/file_with_alpha.raw', 1920, 1080, src_fmt='BGRA')
+    >>> base = clip[0] # RGB24 clip
+    >>> alpha = clip[1] # GRAY8 clip
 
 options:
 --------
@@ -24,11 +29,16 @@ options:
     - **off_frame**      offset to the real data for every frame (0~ default 0)
     - **rowbytes_align** byte alignment of all rows of frame (1~16 default 1)
 
-    these options will be ignored if source is YUV4MPEG/WindowsBitmap.
+    these options will be ignored if source is YUV4MPEG2/WindowsBitmap.
 
 supported color formats:
 ------------------------
     see format_list.txt.
+
+Note:
+-----
+    When input video has alpha channel, this filter returns a list which has two clips.
+    clip[0] is base clip. clip[1] is alpha clip.
 
 How to compile:
 ---------------

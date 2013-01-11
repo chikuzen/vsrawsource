@@ -26,7 +26,7 @@
 #ifndef VS_RAW_SOURCE_H
 #define VS_RAW_SOURCE_H
 
-#define VS_RAWS_VERSION "0.3.0"
+#define VS_RAWS_VERSION "0.3.1"
 
 #ifdef _WIN32
 #ifdef __MINGW32__
