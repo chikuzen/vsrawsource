@@ -39,6 +39,7 @@
 #define snprintf _snprintf
 #define strcasecmp stricmp
 #endif
+#include <windows.h>
 #endif
 
 #include <stdio.h>

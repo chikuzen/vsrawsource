@@ -62,6 +62,37 @@ typedef struct {
 } vs_args_t;
 
 
+static const char *open_source_file(rs_hnd_t *rh, const char *src_name)
+{
+    struct stat st;
+#ifdef _WIN32
+    wchar_t tmp[FILENAME_MAX * 4];
+    MultiByteToWideChar(CP_UTF8, 0, src_name, -1, tmp, FILENAME_MAX * 4);
+
+    if (wstat(tmp, &st) != 0) {
+#else
+    if (stat(src_name, &st) != 0) {
+#endif
+    return "source does not exist.";
+    }
+
+    if (st.st_size == 0) {
+        return "failed to get file size.";
+    }
+    rh->file_size = st.st_size;
+#ifdef _WIN32
+    rh->file = _wfopen(tmp, L"rb");
+#else
+    rh->file = fopen(src_name, "rb");
+#endif
+    if (!rh->file) {
+        return "failed to open source file";
+    }
+
+    return NULL;
+}
+
+
 static void VS_CC
 rs_bit_blt(uint8_t *srcp, int row_size, int height, VSFrameRef *dst, int plane,
            const VSAPI *vsapi)
@@ -761,15 +792,9 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
     rs_hnd_t *rh = (rs_hnd_t *)calloc(sizeof(rs_hnd_t), 1);
     RET_IF_ERROR(!rh, "couldn't create handler");
 
-    const char *src = vsapi->propGetData(in, "source", 0, 0);
-    struct stat st;
-    RET_IF_ERROR(stat(src, &st) != 0, "source does not exist.");
-
-    rh->file_size = st.st_size;
-    RET_IF_ERROR(rh->file_size == 0, "coudn't get source file size");
-
-    rh->file = fopen(src, "rb");
-    RET_IF_ERROR(!rh->file, "coudn't open %s", src);
+    const char *err = 
+        open_source_file(rh, vsapi->propGetData(in, "source", 0, 0));
+    RET_IF_ERROR(err, "%s", err);
 
     int header = check_header(rh);
     RET_IF_ERROR(header == -1, "invalid YUV4MPEG2 header was found");
