@@ -137,7 +137,7 @@ write_planar_frame(rs_hnd_t *rh, VSFrameRef **dst, const VSAPI *vsapi,
         rs_bit_blt(srcp, row_size, height, dst[0], plane, vsapi);
         srcp += row_size * height;
     }
-    
+
     if (rh->has_alpha == 0) {
         return;
     }
@@ -730,13 +730,19 @@ rs_get_frame(int n, int activation_reason, void **instance_data,
         return dst[0];
     }
 
+    if (vsapi->getOutputIndex(frame_ctx) == 0) {
+        vsapi->freeFrame(dst[1]);
+        return dst[0];
+    }
+
+    vsapi->freeFrame(dst[0]);
     props = vsapi->getFramePropsRW(dst[1]);
     vsapi->propSetInt(props, "_DurationNum", rh->vi[1].fpsDen, paReplace);
     vsapi->propSetInt(props, "_DurationDen", rh->vi[1].fpsNum, paReplace);
     vsapi->propSetInt(props, "_SARNum", rh->sar_num, paReplace);
     vsapi->propSetInt(props, "_SARDen", rh->sar_den, paReplace);
 
-    return vsapi->cloneFrameRef(dst[vsapi->getOutputIndex(frame_ctx)]);
+    return dst[1];
 }
 
 
@@ -792,7 +798,7 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
     rs_hnd_t *rh = (rs_hnd_t *)calloc(sizeof(rs_hnd_t), 1);
     RET_IF_ERROR(!rh, "couldn't create handler");
 
-    const char *err = 
+    const char *err =
         open_source_file(rh, vsapi->propGetData(in, "source", 0, 0));
     RET_IF_ERROR(err, "%s", err);
 
@@ -837,7 +843,7 @@ create_source(const VSMap *in, VSMap *out, void *user_data, VSCore *core,
 
     if (rh->has_alpha) {
         rh->vi[1] = rh->vi[0];
-        VSPresetFormat pf = 
+        VSPresetFormat pf =
             rh->vi[0].format->bytesPerSample == 1 ? pfGray8 : pfGray16;
         rh->vi[1].format = vsapi->getFormatPreset(pf, core);
     }
