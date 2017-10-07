@@ -405,6 +405,8 @@ static inline const char * VS_CC get_format(char *ctag)
         char *tag;
         char *format;
     } table[] = {
+        { "mono",     "GRAY"      },
+        { "mono16",   "GRAY16"    },
         { "420jpeg",  "YUV420P8"  },
         { "420mpeg2", "YUV420P8"  },
         { "420paldv", "YUV420P8"  },
