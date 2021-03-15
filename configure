@@ -106,6 +106,14 @@ case "$TARGET_OS" in
         CFLAGS="$CFLAGS -fPIC"
         LDFLAGS="-shared -fPIC -L."
         ;;
+    *darwin*)
+        LIBNAME="libvsrawsource.dylib"
+        CFLAGS="$CFLAGS -fPIC"
+        LDFLAGS="-shared -fPIC -L."
+        CC="clang -Werror=ignored-optimization-argument"
+        LD=clang
+        STRIP=  # darwin strip does not support dylib
+        ;;
     *)
         error_exit "patches welcome"
         ;;
