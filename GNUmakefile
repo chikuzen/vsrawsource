@@ -16,7 +16,7 @@ $(LIBNAME): $(OBJS)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 clean:
-	$(RM) *.o *.dll *.so
+	$(RM) *.o *.dll *.so *.dylib
 
 distclean: clean
 	$(RM) config.mak .depend
